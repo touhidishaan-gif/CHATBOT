@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}AI Tutor{% endblock %}
+
+{% block content %}
+<div class="container tutor-container">
+    <div class="card">
+        <div class="card-header">
+            <h2>Chat with Lingo, your AI Tutor</h2>
+            <p>Practice your English conversation skills. Lingo will gently correct your mistakes.</p>
+        </div>
+        <div class="card-body">
+            <div id="chat-box" class="chat-box">
+                <!-- Initial welcome message from the bot -->
+                <div class="chat-message bot">
+                    <div class="message-content">
+                        <p>Hello! I'm Lingo. What would you like to talk about today?</p>
+                        <button class="speak-btn" aria-label="Listen to this message">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-volume-up-fill" viewBox="0 0 16 16">
+                                <path d="M11.536 14.01A8.47 8.47 0 0 0 14.026 8a8.47 8.47 0 0 0-2.49-6.01l-.708.707A7.48 7.48 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303z"/>
+                                <path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.48 5.48 0 0 1 11.025 8a5.48 5.48 0 0 1-1.61 3.89z"/>
+                                <path d="M8.707 11.182A4.5 4.5 0 0 0 10.025 8a4.5 4.5 0 0 0-1.318-3.182L8 5.525A3.5 3.5 0 0 1 9.025 8 3.5 3.5 0 0 1 8 10.475zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <form id="chat-form" class="chat-form">
+                <input type="text" id="message-input" placeholder="Type your message here..." autocomplete="off" required>
+                <button type="submit" class="button-primary">Send</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const chatBox = document.getElementById('chat-box');
+    const chatForm = document.getElementById('chat-form');
+    const messageInput = document.getElementById('message-input');
+    let isWaitingForResponse = false;
+
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userMessage = messageInput.value.trim();
+
+        if (userMessage === '' || isWaitingForResponse) {
+            return;
+        }
+
+        // Display user's message
+        appendMessage(userMessage, 'user');
+        messageInput.value = '';
+        isWaitingForResponse = true;
+        
+        // Show typing indicator
+        const typingIndicator = showTypingIndicator();
+
+        try {
+            // Send message to the backend
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: userMessage })
+            });
+
+            // Remove typing indicator
+            typingIndicator.remove();
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Network response was not ok.');
+            }
+
+            const data = await response.json();
+            // Display bot's reply
+            appendMessage(data.reply, 'bot');
+        } catch (error) {
+            console.error('Chat Error:', error);
+            appendMessage('Sorry, I encountered an error. Please try again.', 'bot', true);
+        } finally {
+            isWaitingForResponse = false;
+        }
+    });
+
+    function appendMessage(text, sender, isError = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${sender}`;
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        const p = document.createElement('p');
+        p.textContent = text;
+        contentDiv.appendChild(p);
+
+        if (sender === 'bot' && !isError) {
+            // Add speak button for bot messages
+            const speakButton = document.createElement('button');
+            speakButton.className = 'speak-btn';
+            speakButton.setAttribute('aria-label', 'Listen to this message');
+            speakButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-volume-up-fill" viewBox="0 0 16 16"><path d="M11.536 14.01A8.47 8.47 0 0 0 14.026 8a8.47 8.47 0 0 0-2.49-6.01l-.708.707A7.48 7.48 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303z"/><path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.48 5.48 0 0 1 11.025 8a5.48 5.48 0 0 1-1.61 3.89z"/><path d="M8.707 11.182A4.5 4.5 0 0 0 10.025 8a4.5 4.5 0 0 0-1.318-3.182L8 5.525A3.5 3.5 0 0 1 9.025 8 3.5 3.5 0 0 1 8 10.475zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06z"/></svg>`;
+            contentDiv.appendChild(speakButton);
+        }
+
+        messageDiv.appendChild(contentDiv);
+        chatBox.appendChild(messageDiv);
+        // Scroll to the bottom of the chat box
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+        const indicatorDiv = document.createElement('div');
+        indicatorDiv.className = 'chat-message bot typing-indicator';
+        indicatorDiv.innerHTML = `
+            <div class="message-content">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        `;
+        chatBox.appendChild(indicatorDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return indicatorDiv;
+    }
+    
+    // Event delegation for speak buttons
+    chatBox.addEventListener('click', async (e) => {
+        const speakButton = e.target.closest('.speak-btn');
+        if (speakButton) {
+            const messageText = speakButton.previousElementSibling.textContent;
+            playAudio(messageText, speakButton);
+        }
+    });
+
+    async function playAudio(text, button) {
+        if (!text) return;
+        
+        button.disabled = true; // Prevent multiple clicks
+        button.classList.add('loading');
+
+        try {
+            const response = await fetch('/api/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate audio.');
+            }
+
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+
+            audio.onended = () => {
+                button.disabled = false;
+                button.classList.remove('loading');
+                URL.revokeObjectURL(audioUrl); // Clean up
+            };
+        } catch (error) {
+            console.error('TTS Error:', error);
+            button.disabled = false;
+            button.classList.remove('loading');
+        }
+    }
+});
+</script>
+{% endblock %}
+
