@@ -3,171 +3,153 @@
 {% block title %}AI Tutor{% endblock %}
 
 {% block content %}
-<div class="container tutor-container">
-    <div class="card">
-        <div class="card-header">
-            <h2>Chat with Lingo, your AI Tutor</h2>
-            <p>Practice your English conversation skills. Lingo will gently correct your mistakes.</p>
+<div class="page-content fade-in">
+    <h2>Chat with Lingo, your Advanced AI Tutor</h2>
+    <p>Practice your English conversation skills by choosing a real-life scenario below.</p>
+    
+    <div class="tutor-container">
+        <!-- Scenario Selection -->
+        <div id="scenario-selector" class="scenario-selector">
+            <button class="scenario-btn" data-scenario="coffee_shop">☕️ Order Coffee</button>
+            <button class="scenario-btn" data-scenario="job_interview">🤝 Job Interview</button>
+            <button class="scenario-btn" data-scenario="weekend_trip">🗺️ Plan a Trip</button>
+            <button id="reset-btn" class="hidden">🔄 Start a New Scenario</button>
         </div>
-        <div class="card-body">
-            <div id="chat-box" class="chat-box">
-                <!-- Initial welcome message from the bot -->
-                <div class="chat-message bot">
-                    <div class="message-content">
-                        <p>Hello! I'm Lingo. What would you like to talk about today?</p>
-                        <button class="speak-btn" aria-label="Listen to this message">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-volume-up-fill" viewBox="0 0 16 16">
-                                <path d="M11.536 14.01A8.47 8.47 0 0 0 14.026 8a8.47 8.47 0 0 0-2.49-6.01l-.708.707A7.48 7.48 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303z"/>
-                                <path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.48 5.48 0 0 1 11.025 8a5.48 5.48 0 0 1-1.61 3.89z"/>
-                                <path d="M8.707 11.182A4.5 4.5 0 0 0 10.025 8a4.5 4.5 0 0 0-1.318-3.182L8 5.525A3.5 3.5 0 0 1 9.025 8 3.5 3.5 0 0 1 8 10.475zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06z"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
+
+        <div class="chat-window" id="chat-window">
+            <!-- Messages will be injected here by JavaScript -->
+        </div>
+
+        <div class="chat-input-wrapper">
+            <div id="chat-input-area" class="chat-input hidden">
+                <input type="text" id="user-input" placeholder="Type your response here...">
+                <button id="send-btn"><i data-feather="send"></i></button>
             </div>
-            <form id="chat-form" class="chat-form">
-                <input type="text" id="message-input" placeholder="Type your message here..." autocomplete="off" required>
-                <button type="submit" class="button-primary">Send</button>
-            </form>
+            <p id="initial-message" class="initial-message">Please select a scenario to begin your practice session.</p>
         </div>
     </div>
+    <audio id="audio-player" style="display: none;"></audio>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const chatBox = document.getElementById('chat-box');
-    const chatForm = document.getElementById('chat-form');
-    const messageInput = document.getElementById('message-input');
-    let isWaitingForResponse = false;
+    const chatWindow = document.getElementById('chat-window');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const audioPlayer = document.getElementById('audio-player');
+    const scenarioSelector = document.getElementById('scenario-selector');
+    const chatInputArea = document.getElementById('chat-input-area');
+    const initialMessage = document.getElementById('initial-message');
+    const resetBtn = document.getElementById('reset-btn');
 
-    chatForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const userMessage = messageInput.value.trim();
+    let currentScenario = null;
 
-        if (userMessage === '' || isWaitingForResponse) {
-            return;
+    // --- Scenario Management ---
+    scenarioSelector.addEventListener('click', (e) => {
+        const target = e.target.closest('button'); // Handle clicks on icon inside button
+        if (target && target.classList.contains('scenario-btn')) {
+            currentScenario = target.dataset.scenario;
+            startScenario();
         }
+        if (target && target.id === 'reset-btn') {
+            resetScenario();
+        }
+    });
 
-        // Display user's message
-        appendMessage(userMessage, 'user');
-        messageInput.value = '';
-        isWaitingForResponse = true;
+    const startScenario = () => {
+        chatWindow.innerHTML = '';
+        document.querySelectorAll('.scenario-btn').forEach(btn => btn.classList.add('hidden'));
+        resetBtn.classList.remove('hidden');
+        chatInputArea.classList.remove('hidden');
+        initialMessage.classList.add('hidden');
+        userInput.focus();
         
-        // Show typing indicator
-        const typingIndicator = showTypingIndicator();
+        // Get the first message from the bot for this scenario
+        sendMessageToServer('', currentScenario); 
+    };
+    
+    const resetScenario = () => {
+        currentScenario = null;
+        chatWindow.innerHTML = '';
+        document.querySelectorAll('.scenario-btn').forEach(btn => btn.classList.remove('hidden'));
+        resetBtn.classList.add('hidden');
+        chatInputArea.classList.add('hidden');
+        initialMessage.classList.remove('hidden');
+    };
 
+    // --- Message Handling ---
+    const sendMessage = async () => {
+        const message = userInput.value.trim();
+        if (!message) return;
+        
+        appendMessage(message, 'user');
+        userInput.value = '';
+        await sendMessageToServer(message, currentScenario);
+    };
+
+    const sendMessageToServer = async (message, scenario) => {
         try {
-            // Send message to the backend
             const response = await fetch('/api/chat', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ message: userMessage })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, scenario: scenario })
             });
-
-            // Remove typing indicator
-            typingIndicator.remove();
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Network response was not ok.');
-            }
-
+            if (!response.ok) throw new Error('Network response was not ok.');
+            
             const data = await response.json();
-            // Display bot's reply
-            appendMessage(data.reply, 'bot');
+            appendMessage(data.reply, 'tutor');
+
         } catch (error) {
-            console.error('Chat Error:', error);
-            appendMessage('Sorry, I encountered an error. Please try again.', 'bot', true);
-        } finally {
-            isWaitingForResponse = false;
+            appendMessage('Sorry, an error occurred. Please try again.', 'tutor');
+            console.error('Error:', error);
         }
-    });
+    };
 
-    function appendMessage(text, sender, isError = false) {
+    const appendMessage = (text, sender) => {
         const messageDiv = document.createElement('div');
-        messageDiv.className = `chat-message ${sender}`;
+        messageDiv.classList.add('chat-bubble', sender);
         
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
+        const messageP = document.createElement('p');
+        messageP.innerText = text;
+        messageDiv.appendChild(messageP);
+
+        if (sender === 'tutor') {
+            const ttsBtn = document.createElement('button');
+            ttsBtn.classList.add('tts-btn');
+            ttsBtn.innerHTML = '<i data-feather="volume-2"></i>';
+            ttsBtn.onclick = () => handleTTS(text);
+            messageDiv.appendChild(ttsBtn);
+        }
         
-        const p = document.createElement('p');
-        p.textContent = text;
-        contentDiv.appendChild(p);
+        chatWindow.appendChild(messageDiv);
+        feather.replace();
+        chatWindow.scrollTop = chatWindow.scrollHeight; // Auto-scroll
+    };
 
-        if (sender === 'bot' && !isError) {
-            // Add speak button for bot messages
-            const speakButton = document.createElement('button');
-            speakButton.className = 'speak-btn';
-            speakButton.setAttribute('aria-label', 'Listen to this message');
-            speakButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-volume-up-fill" viewBox="0 0 16 16"><path d="M11.536 14.01A8.47 8.47 0 0 0 14.026 8a8.47 8.47 0 0 0-2.49-6.01l-.708.707A7.48 7.48 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303z"/><path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.48 5.48 0 0 1 11.025 8a5.48 5.48 0 0 1-1.61 3.89z"/><path d="M8.707 11.182A4.5 4.5 0 0 0 10.025 8a4.5 4.5 0 0 0-1.318-3.182L8 5.525A3.5 3.5 0 0 1 9.025 8 3.5 3.5 0 0 1 8 10.475zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06z"/></svg>`;
-            contentDiv.appendChild(speakButton);
-        }
-
-        messageDiv.appendChild(contentDiv);
-        chatBox.appendChild(messageDiv);
-        // Scroll to the bottom of the chat box
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function showTypingIndicator() {
-        const indicatorDiv = document.createElement('div');
-        indicatorDiv.className = 'chat-message bot typing-indicator';
-        indicatorDiv.innerHTML = `
-            <div class="message-content">
-                <div class="dot"></div>
-                <div class="dot"></div>
-                <div class="dot"></div>
-            </div>
-        `;
-        chatBox.appendChild(indicatorDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        return indicatorDiv;
-    }
-    
-    // Event delegation for speak buttons
-    chatBox.addEventListener('click', async (e) => {
-        const speakButton = e.target.closest('.speak-btn');
-        if (speakButton) {
-            const messageText = speakButton.previousElementSibling.textContent;
-            playAudio(messageText, speakButton);
-        }
+    // --- Event Listeners ---
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
     });
 
-    async function playAudio(text, button) {
-        if (!text) return;
-        
-        button.disabled = true; // Prevent multiple clicks
-        button.classList.add('loading');
-
+    // --- Text-to-Speech ---
+    const handleTTS = async (text) => {
         try {
             const response = await fetch('/api/tts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: text })
             });
-
-            if (!response.ok) {
-                throw new Error('Failed to generate audio.');
-            }
+            if (!response.ok) throw new Error('Failed to generate audio.');
 
             const audioBlob = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
-            audio.play();
-
-            audio.onended = () => {
-                button.disabled = false;
-                button.classList.remove('loading');
-                URL.revokeObjectURL(audioUrl); // Clean up
-            };
+            audioPlayer.src = audioUrl;
+            audioPlayer.play();
         } catch (error) {
             console.error('TTS Error:', error);
-            button.disabled = false;
-            button.classList.remove('loading');
         }
-    }
+    };
 });
 </script>
 {% endblock %}

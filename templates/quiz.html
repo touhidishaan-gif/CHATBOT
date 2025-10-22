@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}English Quiz{% endblock %}
+
+{% block content %}
+<div class="page-content fade-in">
+    <h2>Test Your Knowledge</h2>
+    <p>Let's see how you do with these random English questions!</p>
+    
+    <div class="quiz-container">
+        <div id="quiz-loading" class="spinner-container">
+            <div class="spinner"></div>
+            <p>Loading question...</p>
+        </div>
+
+        <div id="quiz-content" class="hidden">
+            <h3 id="question-text"></h3>
+            <div id="options-grid" class="quiz-options-grid">
+                <!-- Options will be added here by JavaScript -->
+            </div>
+        </div>
+
+        <div id="result-message" class="quiz-result hidden">
+            <h4 id="result-title"></h4>
+            <p id="result-details"></p>
+            <button id="next-question-btn" class="quiz-next-btn">Next Question <i data-feather="arrow-right"></i></button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const loadingEl = document.getElementById('quiz-loading');
+    const contentEl = document.getElementById('quiz-content');
+    const questionTextEl = document.getElementById('question-text');
+    const optionsGridEl = document.getElementById('options-grid');
+    const resultMessageEl = document.getElementById('result-message');
+    const resultTitleEl = document.getElementById('result-title');
+    const resultDetailsEl = document.getElementById('result-details');
+    const nextQuestionBtn = document.getElementById('next-question-btn');
+
+    let currentQuestionId = null; // Store the ID of the current question
+    let isSubmitting = false; // Prevent double-clicks
+
+    // Function to fetch and display a new question
+    const loadNewQuestion = async () => {
+        // Show loading spinner, hide content
+        loadingEl.classList.remove('hidden');
+        contentEl.classList.add('hidden');
+        resultMessageEl.classList.add('hidden');
+        optionsGridEl.innerHTML = ''; // Clear old options
+        isSubmitting = false;
+
+        try {
+            const response = await fetch('/api/quiz/new');
+            if (!response.ok) throw new Error('Failed to load question.');
+            
+            const data = await response.json();
+            
+            // Populate the new question data
+            currentQuestionId = data.question_id;
+            questionTextEl.innerText = data.question;
+            
+            data.options.forEach(optionText => {
+                const optionBtn = document.createElement('button');
+                optionBtn.classList.add('quiz-option-btn');
+                optionBtn.innerText = optionText;
+                optionBtn.addEventListener('click', () => handleAnswerSubmit(optionText, optionBtn));
+                optionsGridEl.appendChild(optionBtn);
+            });
+
+            // Show content, hide loading
+            loadingEl.classList.add('hidden');
+            contentEl.classList.remove('hidden');
+
+        } catch (error) {
+            console.error('Error loading question:', error);
+            questionTextEl.innerText = 'Error loading question. Please try refreshing the page.';
+        }
+    };
+
+    // Function to handle the user's answer
+    const handleAnswerSubmit = async (selectedAnswer, selectedButton) => {
+        if (isSubmitting) return; // Don't allow multiple submissions
+        isSubmitting = true;
+
+        try {
+            const response = await fetch('/api/quiz/check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question_id: currentQuestionId,
+                    answer: selectedAnswer
+                })
+            });
+            if (!response.ok) throw new Error('Failed to check answer.');
+
+            const data = await response.json();
+            
+            // Show feedback
+            contentEl.classList.add('hidden');
+            resultMessageEl.classList.remove('hidden');
+
+            if (data.is_correct) {
+                resultTitleEl.innerText = 'Correct! 🎉';
+                resultTitleEl.className = 'correct';
+                resultDetailsEl.innerText = 'Great job!';
+                selectedButton.classList.add('correct');
+            } else {
+                resultTitleEl.innerText = 'Not quite... 😕';
+                resultTitleEl.className = 'incorrect';
+                resultDetailsEl.innerText = `The correct answer was: "${data.correct_answer}"`;
+                selectedButton.classList.add('incorrect');
+            }
+
+        } catch (error) {
+            console.error('Error checking answer:', error);
+            isSubmitting = false;
+        }
+    };
+
+    // Load the first question when the page opens
+    loadNewQuestion();
+
+    // Event listener for the "Next Question" button
+    nextQuestionBtn.addEventListener('click', loadNewQuestion);
+});
+</script>
+{% endblock %}

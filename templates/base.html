@@ -15,11 +15,14 @@
         <nav>
             <div class="logo">
                 <i data-feather="message-circle"></i>
-                <h1>Lingo AI</h1>
+                <!-- THIS LINE HAS BEEN CHANGED -->
+                <h1>English Tutor</h1>
             </div>
             <ul>
                 <li class="{{ 'active' if page == 'grammar' }}"><a href="{{ url_for('grammar_page') }}">Grammar & Vocab</a></li>
                 <li class="{{ 'active' if page == 'tutor' }}"><a href="{{ url_for('tutor_page') }}">AI Tutor</a></li>
+                <!-- THIS LINE HAS BEEN FIXED -->
+                <li class="{{ 'active' if page == 'quiz' }}"><a href="{{ url_for('quiz_page') }}">Quiz</a></li>
             </ul>
         </nav>
         <main>
@@ -32,3 +35,4 @@
     </script>
 </body>
 </html>
+
