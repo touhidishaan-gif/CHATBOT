@@ -159,6 +159,75 @@ QUIZ_DATA = [
             "The affect of the rain was bad."
         ],
         "answer": "The rain will affect the game."
+    },
+
+    # --- NEW QUESTIONS ADDED BELOW ---
+
+    {
+        "id": "q15",
+        "question": "What does 'to beat around the bush' mean?",
+        "options": [
+            "To speak directly",
+            "To avoid saying something directly",
+            "To clear a path in a forest",
+            "To be very busy"
+        ],
+        "answer": "To avoid saying something directly"
+    },
+    {
+        "id": "q16",
+        "question": "He ______ to the store when his phone rang.",
+        "options": [
+            "was driving",
+            "drove",
+            "is driving",
+            "driven"
+        ],
+        "answer": "was driving"
+    },
+    {
+        "id": "q17",
+        "question": "What is a synonym for 'meticulous'?",
+        "options": [
+            "Messy",
+            "Quick",
+            "Very careful and precise",
+            "Angry"
+        ],
+        "answer": "Very careful and precise"
+    },
+    {
+        "id": "q18",
+        "question": "The book is on the table, ______ it?",
+        "options": [
+            "is",
+            "isn't",
+            "does",
+            "doesn't"
+        ],
+        "answer": "isn't"
+    },
+    {
+        "id": "q19",
+        "question": "I have ______ money than you.",
+        "options": [
+            "less",
+            "fewer",
+            "many",
+            "little"
+        ],
+        "answer": "less"
+    },
+    {
+        "id": "q20",
+        "question": "What does 'to break the ice' mean?",
+        "options": [
+            "To make something colder",
+            "To end a relationship",
+            "To make people feel more comfortable in a social situation",
+            "To start an argument"
+        ],
+        "answer": "To make people feel more comfortable in a social situation"
     }
 ]
 

@@ -117,79 +117,127 @@ def explain_word(word):
     else:
         return f"Sorry, I don't have a definition for '{word}'. Try another word like 'resilience' or 'ephemeral'."
 
-# --- THE FIX IS HERE: More robust logic ---
+# --- THE FIX IS HERE: Safer formatting in scenario_chatbot_response ---
 def scenario_chatbot_response(message, scenario_id):
     global conversation_state
     if not scenario_id or scenario_id not in SCENARIOS:
         return "Error: Invalid scenario selected."
 
-    if conversation_state["scenario"] != scenario_id:
+    # Initialize or reset the scenario
+    if conversation_state.get("scenario") != scenario_id:
+        conversation_state.clear() # Clear all previous data
         conversation_state.update({"scenario": scenario_id, "step_id": SCENARIOS[scenario_id]["start_step"], "user_data": {}})
-        return SCENARIOS[scenario_id]["steps"][conversation_state["step_id"]]["bot"]
+        # Use .get() for safer access in case step_id is somehow invalid
+        start_step_data = SCENARIOS[scenario_id]["steps"].get(conversation_state["step_id"], {})
+        return start_step_data.get("bot", "Error: Could not start scenario.")
 
     scenario = SCENARIOS[scenario_id]
-    current_step = scenario["steps"][conversation_state["step_id"]]
+    # Use .get() for safer access
+    current_step = scenario["steps"].get(conversation_state.get("step_id"), {})
+    if not current_step:
+         return "Error: Scenario step not found. Please restart." # Handle missing step
+
     user_message_lower = message.lower()
 
-    # --- FIX 1: More Robust Data Gathering ---
-    step_id = conversation_state["step_id"]
+    # Data Gathering
+    step_id = conversation_state.get("step_id")
+    # Wrap data gathering in checks to ensure it only happens at the right step
     if step_id == "start" and scenario_id == "coffee_shop":
         if "coffee" in user_message_lower: conversation_state["user_data"]["drink"] = "coffee"
         elif "latte" in user_message_lower: conversation_state["user_data"]["drink"] = "latte"
         elif "cappuccino" in user_message_lower: conversation_state["user_data"]["drink"] = "cappuccino"
         elif "tea" in user_message_lower: conversation_state["user_data"]["drink"] = "tea"
-    if step_id == "size" and scenario_id == "coffee_shop":
+    elif step_id == "size" and scenario_id == "coffee_shop":
         if "small" in user_message_lower: conversation_state["user_data"]["size"] = "small"
         elif "medium" in user_message_lower: conversation_state["user_data"]["size"] = "medium"
         elif "large" in user_message_lower: conversation_state["user_data"]["size"] = "large"
-    if step_id == "intro" and scenario_id == "weekend_trip": conversation_state["user_data"]["vibe"] = message
-    if "beach" in user_message_lower: conversation_state["user_data"]["location"] = "a quiet beach"
-    if "cabin" in user_message_lower: conversation_state["user_data"]["location"] = "a cozy mountain cabin"
-    if "hike" in user_message_lower: conversation_state["user_data"]["activity"] = "hiking"
-    if "kayak" in user_message_lower: conversation_state["user_data"]["activity"] = "kayaking"
-    if "museum" in user_message_lower: conversation_state["user_data"]["activity"] = "visiting museums"
-    if "restaurant" in user_message_lower: conversation_state["user_data"]["activity"] = "trying new restaurants"
-    if "budget" in user_message_lower or "local" in user_message_lower or "cheap" in user_message_lower:
-        conversation_state["user_data"]["food"] = "budget-friendly local eats"
-    if "dining" in user_message_lower or "fancy" in user_message_lower or "expensive" in user_message_lower:
-        conversation_state["user_data"]["food"] = "a fine dining experience"
-    if "tomorrow" in user_message_lower: conversation_state["user_data"]["time"] = "tomorrow morning at 10 AM"
-    if "day after" in user_message_lower: conversation_state["user_data"]["time"] = "the day after tomorrow at 2 PM"
+    elif step_id == "intro" and scenario_id == "weekend_trip": conversation_state["user_data"]["vibe"] = message
+    elif step_id == "relax_choice" and scenario_id == "weekend_trip":
+         if "beach" in user_message_lower: conversation_state["user_data"]["location"] = "a quiet beach"
+         if "cabin" in user_message_lower: conversation_state["user_data"]["location"] = "a cozy mountain cabin"
+    elif step_id == "adventure_choice" and scenario_id == "weekend_trip":
+        if "hike" in user_message_lower: conversation_state["user_data"]["activity"] = "hiking"
+        if "kayak" in user_message_lower: conversation_state["user_data"]["activity"] = "kayaking"
+    elif step_id == "city_choice" and scenario_id == "weekend_trip":
+        if "museum" in user_message_lower: conversation_state["user_data"]["activity"] = "visiting museums"
+        if "restaurant" in user_message_lower: conversation_state["user_data"]["activity"] = "trying new restaurants"
+    elif step_id == "food_choice" and scenario_id == "weekend_trip":
+        if "budget" in user_message_lower or "local" in user_message_lower or "cheap" in user_message_lower:
+            conversation_state["user_data"]["food"] = "budget-friendly local eats"
+        if "dining" in user_message_lower or "fancy" in user_message_lower or "expensive" in user_message_lower:
+            conversation_state["user_data"]["food"] = "a fine dining experience"
+    elif step_id == "when" and scenario_id == "doctor_appointment":
+         if "tomorrow" in user_message_lower: conversation_state["user_data"]["time"] = "tomorrow morning at 10 AM"
+         if "day after" in user_message_lower: conversation_state["user_data"]["time"] = "the day after tomorrow at 2 PM"
 
     next_step_id = None
     if "options" in current_step:
         for option in current_step["options"]:
-            if any(keyword in user_message_lower for keyword in option["keywords"]):
-                next_step_id = option["next_step"]; break
+            if any(keyword in user_message_lower for keyword in option.get("keywords", [])): # Safer access
+                next_step_id = option.get("next_step"); break
         if not next_step_id:
-            return f"(I didn't quite catch that. Could you choose one of the options? Let's try again...) {current_step['bot']}"
+            return f"(I didn't quite catch that. Could you choose one of the options? Let's try again...) {current_step.get('bot', '')}"
     else:
-        if current_step.get("accept_any", False):
-            next_step_id = current_step.get("next_step")
-        elif any(keyword in user_message_lower for keyword in current_step.get("keywords", [])):
+        # Accept any input if "accept_any" is true OR if no keywords are defined (treat as accept_any)
+        accept_input = current_step.get("accept_any", False) or not current_step.get("keywords")
+        # Check keywords only if accept_any is false AND keywords are defined
+        keywords_match = not accept_input and any(keyword in user_message_lower for keyword in current_step.get("keywords", []))
+        
+        if accept_input or keywords_match:
              next_step_id = current_step.get("next_step")
         else:
-            return f"(I was hoping for a bit more detail. Let's try that question again...) {current_step['bot']}"
+             # Reprompt if keywords were expected but not found
+             return f"(I was hoping for a bit more detail, maybe using words like '{', '.join(current_step.get('keywords',[]))}'. Let's try that question again...) {current_step.get('bot', '')}"
+
 
     if not next_step_id:
-        conversation_state["scenario"] = None
-        return current_step.get("feedback", "Scenario complete. Well done!")
+        feedback_msg = current_step.get("feedback", "Scenario complete. Well done!")
+        conversation_state.clear() # Fully reset state
+        conversation_state.update({"scenario": None, "step_id": None, "user_data": {}})
+        return feedback_msg
 
     conversation_state["step_id"] = next_step_id
-    next_bot_message = scenario["steps"][next_step_id]["bot"]
+    next_step_data = scenario["steps"].get(next_step_id, {}) # Safer access
+    next_bot_message = next_step_data.get("bot", "Error: Next step message not found.")
 
-    if "{summary}" in next_bot_message:
-        ud = conversation_state['user_data']
-        summary = f"A {ud.get('vibe', 'city')} trip featuring {ud.get('activity', ud.get('location', ''))} with a focus on {ud.get('food', 'local eats')}."
-        next_bot_message = next_bot_message.format(summary=summary)
-    
-    bot_response = next_bot_message.format(**(conversation_state.get("user_data", {})))
+    # --- SAFER DYNAMIC MESSAGE GENERATION using .get() ---
+    try:
+        if "{summary}" in next_bot_message:
+            ud = conversation_state.get('user_data', {})
+            # Use .get() with defaults for each piece of the summary
+            vibe = ud.get('vibe', 'unknown vibe')
+            activity = ud.get('activity', '')
+            location = ud.get('location', '')
+            activity_location = activity or location or "an interesting place" # Combine or default
+            food = ud.get('food', 'some nice food')
+            summary = f"A {vibe} trip featuring {activity_location} with a focus on {food}."
+            bot_response = next_bot_message.format(summary=summary)
+        else:
+            # Create a default dict to avoid KeyError during format if user_data is missing keys
+            safe_user_data = conversation_state.get("user_data", {}).copy()
+            # Check for expected keys in the bot message string itself before formatting
+            expected_keys = re.findall(r'\{(.*?)\}', next_bot_message)
+            for key in expected_keys:
+                if key not in safe_user_data:
+                    safe_user_data[key] = f"[{key}?]" # Placeholder if data missing
 
-    # --- FIX 2: Check if the next step is the final one and combine messages ---
-    final_step = scenario["steps"][next_step_id]
-    if "feedback" in final_step:
-        bot_response += "\n\n" + final_step["feedback"]
-        conversation_state["scenario"] = None # End the scenario
+            bot_response = next_bot_message.format(**safe_user_data)
+
+    except KeyError as e:
+         print(f"KeyError during formatting: {e}. User data: {conversation_state.get('user_data')}")
+         bot_response = "Something went wrong building the response. Let's try the next step."
+         # Attempt to recover by just getting the raw next message without formatting
+         bot_response = next_step_data.get("bot", "Error proceeding.")
+         # Check if this fallback message *also* needs formatting and handle if necessary
+         if re.search(r'\{.*?\}', bot_response):
+             bot_response = "Okay, let's continue." # Generic fallback
+
+
+    final_step_data = scenario["steps"].get(next_step_id, {})
+    if "feedback" in final_step_data:
+        bot_response += "\n\n" + final_step_data["feedback"]
+        conversation_state.clear() # Fully reset state
+        conversation_state.update({"scenario": None, "step_id": None, "user_data": {}})
     
     return bot_response
 
